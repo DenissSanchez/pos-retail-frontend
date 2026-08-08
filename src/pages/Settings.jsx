@@ -26,7 +26,7 @@ import CircleIcon from '@mui/icons-material/Circle';
 import axios from 'axios';
 import { useSnackbar } from 'notistack';
 
-const API_URL = 'http://localhost:3000/api/settings'; // Archivo ANTIGUO
+const API_URL = `${import.meta.env.VITE_API_URL}/settings`; // Archivo ANTIGUO
 
 function CustomTabPanel({ children, value, index }) {
   return (

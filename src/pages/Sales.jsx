@@ -140,8 +140,8 @@ export default function Sales() {
       setBarcode('');
 
       try {
-        const response = await axios.get(`http://localhost:3000/api/sales/search`, {
-          params: { code: codeToSearch, storeId }
+    const response = await axios.get(`${import.meta.env.VITE_API_URL}/sales/search`, {
+        params: { code: codeToSearch, storeId }
         });
 
         const product = response.data;
@@ -252,7 +252,7 @@ export default function Sales() {
         reference: (paymentMethod === 'TARJETA' || paymentMethod === 'TRANSFERENCIA' || paymentMethod === 'MIXTO') ? reference.trim() : null
       };
 
-      await axios.post('http://localhost:3000/api/sales', payload);
+      await axios.post(`${import.meta.env.VITE_API_URL}/sales/checkout`, payload);
 
       enqueueSnackbar('¡Venta realizada con éxito! 🛍️', { variant: 'success' });
 

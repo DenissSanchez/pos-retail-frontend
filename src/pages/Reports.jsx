@@ -59,11 +59,11 @@ export default function Reports() {
         ? new Date(`${endDate}T23:59:59.999`).toISOString() 
         : null;
 
-      const response = await axios.get('http://localhost:3000/api/reports/sales', {
-        params: { 
-          startDate: formattedStartDate, 
-          endDate: formattedEndDate 
-        }
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/reports/sales`, {
+    params: { 
+      startDate: formattedStartDate, 
+      endDate: formattedEndDate 
+    }
       });
 
       setSales(response.data || []);

@@ -102,42 +102,42 @@ export default function Inventory() {
     };
 
     const fetchImportHistory = async () => {
-        try {
-            const response = await fetch("http://localhost:3000/api/inventory/imports");
-            const data = await response.json();
-            setImportHistory(data);
-            setOpenHistory(true);
-        } catch (error) {
-            console.error(error);
-        }
-    };
+    try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/inventory/imports`);
+        const data = await response.json();
+        setImportHistory(data);
+        setOpenHistory(true);
+    } catch (error) {
+        console.error(error);
+    }
+};
 
     const downloadImportFile = async (id) => {
-        try {
-            const response = await fetch(`http://localhost:3000/api/import-history/${id}/download`);
-            if (!response.ok) {
-                throw new Error("No se pudo descargar el archivo.");
-            }
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            const disposition = response.headers.get("Content-Disposition");
-            let fileName = "importacion.xlsx";
-            if (disposition) {
-                const match = disposition.match(/filename="?(.+)"?/);
-                if (match) fileName = match[1];
-            }
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error(error);
-            alert("No fue posible descargar el archivo.");
+    try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/import-history/${id}/download`);
+        if (!response.ok) {
+            throw new Error("No se pudo descargar el archivo.");
         }
-    };
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const disposition = response.headers.get("Content-Disposition");
+        let fileName = "importacion.xlsx";
+        if (disposition) {
+            const match = disposition.match(/filename="?(.+)"?/);
+            if (match) fileName = match[1];
+        }
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error(error);
+        alert("No fue posible descargar el archivo.");
+    }
+};
 
     const handleDeleteImport = async (id) => {
         const confirmed = window.confirm(

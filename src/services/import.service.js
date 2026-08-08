@@ -1,4 +1,5 @@
-const BASE_URL = "http://localhost:3000/api/import";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const BASE_URL = `${API_BASE_URL}/import`;
 
 // Función auxiliar para peticiones JSON
 const request = async (url, body) => {
@@ -55,7 +56,7 @@ export const importProductsAPI = async (rows, options, file = null) => {
 
 export const downloadImportFile = async (id) => {
   const response = await fetch(
-    `http://localhost:3000/api/import-history/${id}/download`
+    `${API_BASE_URL}/import-history/${id}/download`
   );
 
   if (!response.ok) {
@@ -89,7 +90,7 @@ export const downloadImportFile = async (id) => {
 // 🟢 FIX: La función termina limpiamente en el return data;
 export const deleteImportHistory = async (id) => {
   const response = await fetch(
-    `http://localhost:3000/api/import-history/${id}`,
+    `${API_BASE_URL}/import-history/${id}`,
     {
       method: "DELETE"
     }
