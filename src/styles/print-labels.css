@@ -1,0 +1,133 @@
+/* ==========================================================
+   ESTILOS GENERALES Y VISTA PREVIA EN PANTALLA
+   ========================================================== */
+
+.label-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 12px;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+}
+
+/* Estilo visual de la etiqueta en pantalla */
+.label-card {
+  width: 50mm;
+  height: 25mm;
+  box-sizing: border-box;
+  padding: 2mm;
+  background: #ffffff;
+  border: 1px dashed #d1d5db;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Courier New', Courier, monospace; /* Tipografía limpia monoespaciada */
+  text-align: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.label-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8px;
+  font-weight: bold;
+  color: #111827;
+  line-height: 1;
+}
+
+.label-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 65%;
+}
+
+.label-price {
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.label-barcode-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 1mm 0;
+}
+
+.label-barcode-container svg {
+  max-width: 100%;
+  height: 12mm !important; /* Altura óptima para lectura rápida */
+}
+
+.label-footer {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 7px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1;
+}
+
+/* ==========================================================
+   CONFIGURACIÓN PARA IMPRESIÓN (IMPRESORA TÉRMICA)
+   ========================================================== */
+
+@media print {
+  /* Configuración del papel de la impresora térmica */
+  @page {
+    size: 50mm 25mm; /* Cambiar a 38mm 25mm si usas un rollo más chico */
+    margin: 0;
+  }
+
+  /* Ocultar la interfaz principal de la app */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Ocultar elementos generales no imprimibles */
+  .no-print,
+  nav,
+  header,
+  sidebar,
+  button,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  /* Mostrar solo el contenedor que tiene el lote activo de etiquetas */
+  #printable-labels-area,
+  #printable-labels-area * {
+    visibility: visible;
+  }
+
+  #printable-labels-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50mm;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .label-card {
+    border: none !important;
+    border-radius: 0 !important;
+    width: 50mm !important;
+    height: 25mm !important;
+    padding: 1.5mm !important;
+    page-break-after: always; /* Fuerza salto de hoja física por cada etiqueta */
+    break-after: page;
+  }
+}
