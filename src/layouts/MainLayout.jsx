@@ -7,6 +7,19 @@ import Navbar from "../components/layout/Navbar";
 import CloseSessionModal from "../components/CloseSessionModal";
 import CashTicket from "../components/CashTicket";
 
+const getStoredSessionId = () => {
+  const directId = localStorage.getItem("sessionId");
+  if (directId) return directId;
+
+  try {
+    const userStr = localStorage.getItem("user");
+    const parsedUser = userStr ? JSON.parse(userStr) : null;
+    return parsedUser?.sessionId || parsedUser?.activeSession?.id || null;
+  } catch {
+    return null;
+  }
+};
+
 export default function MainLayout() {
   const navigate = useNavigate();
   const [openCloseModal, setOpenCloseModal] = useState(false);
@@ -17,24 +30,27 @@ export default function MainLayout() {
   const [openTicketModal, setOpenTicketModal] = useState(false);
 
   // Recuperamos el ID de la sesión activa
-  const sessionId = localStorage.getItem("sessionId");
+  const sessionId = getStoredSessionId();
   const activeSession = sessionId ? { id: sessionId } : null;
 
   // Disparador del modal de cierre
   const handleOpenCloseModal = () => {
-    if (!sessionId) {
+    const currentSessionId = getStoredSessionId();
+    if (!currentSessionId) {
       alert("No se encontró una sesión de caja activa.");
       return;
     }
     setOpenCloseModal(true);
   };
 
-  // 1. Salir sin cerrar caja (logout simple)
+  // 1. Salir (logout para admin)
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("role");
     localStorage.removeItem("sessionId");
-    navigate("/login");
+    localStorage.removeItem("storeId");
+    navigate("/login", { replace: true });
   };
 
   // 2. Callback cuando la caja se cierra con éxito
@@ -42,6 +58,7 @@ export default function MainLayout() {
     setClosedSessionData(closedSession);
     setSummaryData(summary);
     setOpenCloseModal(false);
+    localStorage.removeItem("sessionId");
     
     // Abrimos el modal con el ticket listo para imprimir
     setOpenTicketModal(true);
@@ -51,7 +68,7 @@ export default function MainLayout() {
   const handleFinishAndLogout = () => {
     localStorage.clear();
     setOpenTicketModal(false);
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   return (

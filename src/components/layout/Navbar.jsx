@@ -82,22 +82,23 @@ export default function Navbar({ onOpenCloseModal, onLogout }) {
             {initial}
           </Avatar>
 
-          {/* Botón de Salir (Logout) */}
-          {/* Botón de Salir (Logout) */}
-          <Tooltip title="Cerrar sesión">
-            <IconButton
-              color="error"
-              onClick={onLogout}
-              size="small"
-              sx={{
-                borderRadius: "8px",
-                border: "1px solid",
-                borderColor: "error.light",
-              }}
-            >
-              <LogoutIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          {/* Botón de Salir (SOLO ADMIN; para cajero solo existe Cerrar Caja) */}
+          {isAdmin && (
+            <Tooltip title="Cerrar sesión">
+              <IconButton
+                color="error"
+                onClick={onLogout}
+                size="small"
+                sx={{
+                  borderRadius: "8px",
+                  border: "1px solid",
+                  borderColor: "error.light",
+                }}
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
 
         </Box>
 
