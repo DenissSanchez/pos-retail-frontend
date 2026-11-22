@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Box, Dialog, DialogContent, DialogActions, Button } from "@mui/material";
 import { Outlet, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 import Sidebar from "../components/layout/Sidebar";
 import Navbar from "../components/layout/Navbar";
@@ -23,23 +24,75 @@ const getStoredSessionId = () => {
 export default function MainLayout() {
   const navigate = useNavigate();
   const [openCloseModal, setOpenCloseModal] = useState(false);
-  
+  const [sessionId, setSessionId] = useState(() => getStoredSessionId());
+
   // Estado para desplegar el ticket una vez cerrada la caja con éxito
   const [closedSessionData, setClosedSessionData] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [openTicketModal, setOpenTicketModal] = useState(false);
 
-  // Recuperamos el ID de la sesión activa
-  const sessionId = getStoredSessionId();
+  const fetchActiveSession = useCallback(async () => {
+    try {
+      const userStr = localStorage.getItem("user");
+      const parsedUser = userStr ? JSON.parse(userStr) : null;
+      if (!parsedUser?.id) return null;
+
+      const registerId =
+        parsedUser?.stores?.[0]?.registers?.[0]?.id ||
+        localStorage.getItem("registerId") ||
+        undefined;
+
+      const token = localStorage.getItem("token");
+      const baseUrl = import.meta.env?.VITE_API_URL || "http://localhost:3000/api";
+
+      const response = await axios.get(`${baseUrl}/sessions/active`, {
+        params: registerId ? { registerId } : {},
+        headers: {
+          "x-user-id": parsedUser.id,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const activeId = response.data?.session?.id || null;
+
+      if (activeId) {
+        localStorage.setItem("sessionId", activeId);
+        setSessionId(activeId);
+        return activeId;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error al buscar sesión activa:", error);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const existingId = getStoredSessionId();
+    if (existingId) {
+      setSessionId(existingId);
+    } else {
+      fetchActiveSession();
+    }
+  }, [fetchActiveSession]);
+
   const activeSession = sessionId ? { id: sessionId } : null;
 
   // Disparador del modal de cierre
-  const handleOpenCloseModal = () => {
-    const currentSessionId = getStoredSessionId();
+  const handleOpenCloseModal = async () => {
+    let currentSessionId = getStoredSessionId() || sessionId;
+
+    if (!currentSessionId) {
+      currentSessionId = await fetchActiveSession();
+    }
+
     if (!currentSessionId) {
       alert("No se encontró una sesión de caja activa.");
       return;
     }
+
+    setSessionId(currentSessionId);
     setOpenCloseModal(true);
   };
 
@@ -50,6 +103,8 @@ export default function MainLayout() {
     localStorage.removeItem("role");
     localStorage.removeItem("sessionId");
     localStorage.removeItem("storeId");
+    localStorage.removeItem("registerId");
+    setSessionId(null);
     navigate("/login", { replace: true });
   };
 
@@ -59,7 +114,8 @@ export default function MainLayout() {
     setSummaryData(summary);
     setOpenCloseModal(false);
     localStorage.removeItem("sessionId");
-    
+    setSessionId(null);
+
     // Abrimos el modal con el ticket listo para imprimir
     setOpenTicketModal(true);
   };
@@ -67,6 +123,7 @@ export default function MainLayout() {
   // 3. Finalizar flujo tras ver/imprimir el ticket
   const handleFinishAndLogout = () => {
     localStorage.clear();
+    setSessionId(null);
     setOpenTicketModal(false);
     navigate("/login", { replace: true });
   };
