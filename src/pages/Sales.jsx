@@ -34,16 +34,16 @@ const playBeep = () => {
     const gainNode = audioCtx.createGain();
 
     oscillator.type = "sine"; 
-    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // Tono agudo limpio
+    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
     
-    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volumen sutil
+    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
 
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
     oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.1); // Duración de 100ms
+    oscillator.stop(audioCtx.currentTime + 0.1);
   } catch (e) {
     console.log("El navegador bloqueó el audio temporalmente", e);
   }
@@ -80,9 +80,14 @@ export default function Sales() {
     documentTitle: 'Ticket_de_Venta',
   });
 
-  // --- CÁLCULOS DE TOTALES Y DESCUENTOS ---
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+  // --- CÁLCULOS DE TOTALES Y DESCUENTOS (BLINDADOS) ---
+  const subtotal = cart.reduce((acc, item) => {
+    const price = Number(item.price || 0);
+    const qty = Number(item.quantity || 0);
+    return acc + (price * qty);
+  }, 0);
+
+  const totalItems = cart.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
   
   const numericDiscountPercent = Math.min(Math.max(parseFloat(discountPercent) || 0, 0), 100);
   const discountAmount = (subtotal * numericDiscountPercent) / 100;
@@ -140,20 +145,18 @@ export default function Sales() {
       setBarcode('');
 
       try {
-    const response = await axios.get(`${import.meta.env.VITE_API_URL}/sales/search`, {
-        params: { code: codeToSearch, storeId }
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/sales/search`, {
+          params: { code: codeToSearch, storeId }
         });
 
         const product = response.data;
 
-        if (!product || product.stock <= 0) {
+        if (!product || Number(product.stock || 0) <= 0) {
           enqueueSnackbar('Producto sin stock o no encontrado', { variant: 'warning' });
           return;
         }
 
         addToCart(product);
-        
-        // 🔊 Reproducir el beep de éxito al escanear correctamente
         playBeep();
 
       } catch (error) {
@@ -163,6 +166,9 @@ export default function Sales() {
   };
 
   const addToCart = (productToAdd) => {
+    // 🛡️ Aseguramos que el precio sea un número válido (revisando variantes por si acaso)
+    const safePrice = Number(productToAdd.price || productToAdd.Precio || 0);
+
     setCart((prevCart) => {
       const existingIndex = prevCart.findIndex(item => item.variantId === productToAdd.variantId);
 
@@ -171,7 +177,7 @@ export default function Sales() {
         const currentItem = updatedCart[existingIndex];
         const newQty = currentItem.quantity + 1;
 
-        if (newQty > productToAdd.stock) {
+        if (newQty > Number(productToAdd.stock || 0)) {
           setSnackbar({
             open: true,
             message: `⚠️ No hay suficiente stock. Disponible: ${productToAdd.stock} unidades.`,
@@ -182,12 +188,13 @@ export default function Sales() {
 
         updatedCart[existingIndex] = {
           ...currentItem,
+          price: safePrice,
           quantity: newQty
         };
 
         return updatedCart;
       } else {
-        return [...prevCart, { ...productToAdd, quantity: 1 }];
+        return [...prevCart, { ...productToAdd, price: safePrice, quantity: 1 }];
       }
     });
   };
@@ -198,7 +205,7 @@ export default function Sales() {
         if (item.variantId === variantId) {
           const newQty = item.quantity + delta;
 
-          if (delta > 0 && newQty > item.stock) {
+          if (delta > 0 && newQty > Number(item.stock || 0)) {
             setSnackbar({
               open: true,
               message: `⚠️ No puedes agregar más. Stock disponible: ${item.stock}`,
@@ -244,7 +251,7 @@ export default function Sales() {
         items: cart.map(item => ({
           variantId: item.variantId,
           quantity: item.quantity,
-          price: item.price
+          price: Number(item.price || 0)
         })),
         paymentMethod,
         payments,
@@ -256,10 +263,7 @@ export default function Sales() {
 
       enqueueSnackbar('¡Venta realizada con éxito! 🛍️', { variant: 'success' });
 
-      // 🖨️ Dispara automáticamente la impresión del ticket oculto
       triggerPrint();
-
-      // Limpia la pantalla de ventas para la siguiente transacción
       handleClearCart();
 
     } catch (error) {
@@ -286,7 +290,7 @@ export default function Sales() {
       <Grid container spacing={3}>
         
         {/* COLUMNA IZQUIERDA: Buscador y Carrito */}
-        <Grid size={{ xs: 12, md: 7.5 }}>
+        <Grid item xs={12} md={7.5}>
           <Paper
             elevation={0}
             sx={{
@@ -318,14 +322,12 @@ export default function Sales() {
                   '&.Mui-focused fieldset': { borderColor: '#5B2C83', borderWidth: '2px' }
                 }
               }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <QrCodeScannerIcon sx={{ color: '#5B2C83', fontSize: 28 }} />
-                    </InputAdornment>
-                  )
-                }
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <QrCodeScannerIcon sx={{ color: '#5B2C83', fontSize: 28 }} />
+                  </InputAdornment>
+                )
               }}
             />
 
@@ -355,54 +357,59 @@ export default function Sales() {
                   </Typography>
                 </Box>
               ) : (
-                cart.map((item) => (
-                  <Box
-                    key={item.variantId}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      py: 1.5,
-                      borderBottom: '1px solid #F0F0F0'
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ bgcolor: '#F3E8FF', width: 42, height: 42 }}>
-                        {renderCategoryIcon(item.category)}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-                          {item.productName}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#666' }}>
-                          SKU: {item.sku || 'N/A'} • Color: {item.color || '—'} • Talla: {item.size || '—'}
-                        </Typography>
-                      </Box>
-                    </Box>
+                cart.map((item) => {
+                  const itemPrice = Number(item.price || 0);
+                  const itemQty = Number(item.quantity || 0);
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 'bold', minWidth: '70px', textAlign: 'right' }}>
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </Typography>
-
-                      <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#F8F5FC', borderRadius: '10px', p: 0.5 }}>
-                        <IconButton size="small" onClick={() => updateQuantity(item.variantId, -1)}>
-                          <RemoveIcon fontSize="small" sx={{ color: '#5B2C83' }} />
-                        </IconButton>
-                        <Typography sx={{ px: 1.5, fontWeight: 'bold' }}>
-                          {item.quantity}
-                        </Typography>
-                        <IconButton size="small" onClick={() => updateQuantity(item.variantId, 1)}>
-                          <AddIcon fontSize="small" sx={{ color: '#5B2C83' }} />
-                        </IconButton>
+                  return (
+                    <Box
+                      key={item.variantId}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        py: 1.5,
+                        borderBottom: '1px solid #F0F0F0'
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{ bgcolor: '#F3E8FF', width: 42, height: 42 }}>
+                          {renderCategoryIcon(item.category)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+                            {item.productName || item.name}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#666' }}>
+                            SKU: {item.sku || 'N/A'} • Color: {item.color || '—'} • Talla: {item.size || '—'}
+                          </Typography>
+                        </Box>
                       </Box>
 
-                      <IconButton size="small" onClick={() => removeFromCart(item.variantId)}>
-                        <DeleteIcon fontSize="small" sx={{ color: '#aaa' }} />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', minWidth: '70px', textAlign: 'right' }}>
+                          ${(itemPrice * itemQty).toFixed(2)}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#F8F5FC', borderRadius: '10px', p: 0.5 }}>
+                          <IconButton size="small" onClick={() => updateQuantity(item.variantId, -1)}>
+                            <RemoveIcon fontSize="small" sx={{ color: '#5B2C83' }} />
+                          </IconButton>
+                          <Typography sx={{ px: 1.5, fontWeight: 'bold' }}>
+                            {itemQty}
+                          </Typography>
+                          <IconButton size="small" onClick={() => updateQuantity(item.variantId, 1)}>
+                            <AddIcon fontSize="small" sx={{ color: '#5B2C83' }} />
+                          </IconButton>
+                        </Box>
+
+                        <IconButton size="small" onClick={() => removeFromCart(item.variantId)}>
+                          <DeleteIcon fontSize="small" sx={{ color: '#aaa' }} />
+                        </IconButton>
+                      </Box>
                     </Box>
-                  </Box>
-                ))
+                  );
+                })
               )}
             </Box>
 
@@ -431,7 +438,7 @@ export default function Sales() {
         </Grid>
 
         {/* COLUMNA DERECHA: Totales, Descuentos y Pago */}
-        <Grid size={{ xs: 12, md: 4.5 }}>
+        <Grid item xs={12} md={4.5}>
           <Paper
             elevation={0}
             sx={{
@@ -466,10 +473,8 @@ export default function Sales() {
                   value={discountPercent}
                   onChange={(e) => setDiscountPercent(e.target.value)}
                   placeholder="0"
-                  slotProps={{
-                    input: {
-                      endAdornment: <InputAdornment position="end">%</InputAdornment>
-                    }
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>
                   }}
                   sx={{
                     width: '100px',
@@ -499,7 +504,7 @@ export default function Sales() {
               </Typography>
 
               <Grid container spacing={1} sx={{ mb: 2 }}>
-                <Grid size={{ xs: 3 }}>
+                <Grid item xs={3}>
                   <Button
                     fullWidth
                     variant={paymentMethod === 'EFECTIVO' ? 'contained' : 'outlined'}
@@ -516,7 +521,7 @@ export default function Sales() {
                     Efectivo
                   </Button>
                 </Grid>
-                <Grid size={{ xs: 3 }}>
+                <Grid item xs={3}>
                   <Button
                     fullWidth
                     variant={paymentMethod === 'TARJETA' ? 'contained' : 'outlined'}
@@ -533,7 +538,7 @@ export default function Sales() {
                     Tarjeta
                   </Button>
                 </Grid>
-                <Grid size={{ xs: 3 }}>
+                <Grid item xs={3}>
                   <Button
                     fullWidth
                     variant={paymentMethod === 'TRANSFERENCIA' ? 'contained' : 'outlined'}
@@ -550,7 +555,7 @@ export default function Sales() {
                     Transf.
                   </Button>
                 </Grid>
-                <Grid size={{ xs: 3 }}>
+                <Grid item xs={3}>
                   <Button
                     fullWidth
                     variant={paymentMethod === 'MIXTO' ? 'contained' : 'outlined'}
@@ -579,10 +584,8 @@ export default function Sales() {
                     value={amountPaid}
                     onChange={(e) => setAmountPaid(e.target.value)}
                     placeholder="0.00"
-                    slotProps={{
-                      input: {
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                      }
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
                     }}
                     sx={{ 
                       mb: 1.5, 
@@ -598,7 +601,7 @@ export default function Sales() {
                       onClick={() => setAmountPaid(total.toString())}
                       sx={{ borderRadius: '8px', borderColor: '#D8C5ED', color: '#5B2C83', textTransform: 'none', fontSize: '0.75rem' }}
                     >
-                      Exacto (${total.toFixed(0)})
+                      Exacto (${isNaN(total) ? '0.00' : total.toFixed(0)})
                     </Button>
                     {[100, 200, 500, 1000].map((bill) => (
                       <Button
@@ -646,14 +649,12 @@ export default function Sales() {
                           ? '✓ Folio de 12 dígitos completo'
                           : `${reference.length}/12 dígitos`
                     }
-                    slotProps={{
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <ReceiptLongIcon fontSize="small" sx={{ color: '#5B2C83' }} />
-                          </InputAdornment>
-                        ),
-                      }
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <ReceiptLongIcon fontSize="small" sx={{ color: '#5B2C83' }} />
+                        </InputAdornment>
+                      ),
                     }}
                     sx={{
                       '& .MuiInputBase-root': { fontSize: '0.9rem' },
@@ -674,7 +675,7 @@ export default function Sales() {
               {paymentMethod === 'MIXTO' && (
                 <Box sx={{ mt: 1.5, p: 2, bgcolor: '#F8F5FC', borderRadius: '16px' }}>
                   <Grid container spacing={1.5}>
-                    <Grid size={{ xs: 6 }}>
+                    <Grid item xs={6}>
                       <TextField
                         fullWidth
                         size="small"
@@ -683,10 +684,10 @@ export default function Sales() {
                         value={mixedCash}
                         onChange={(e) => setMixedCash(e.target.value)}
                         placeholder="0.00"
-                        slotProps={{ input: { startAdornment: <InputAdornment position="start">$</InputAdornment> } }}
+                        InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
                       />
                     </Grid>
-                    <Grid size={{ xs: 6 }}>
+                    <Grid item xs={6}>
                       <TextField
                         fullWidth
                         size="small"
@@ -695,10 +696,10 @@ export default function Sales() {
                         value={mixedCard}
                         onChange={(e) => setMixedCard(e.target.value)}
                         placeholder="0.00"
-                        slotProps={{ input: { startAdornment: <InputAdornment position="start">$</InputAdornment> } }}
+                        InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
                       />
                     </Grid>
-                    <Grid size={{ xs: 12 }}>
+                    <Grid item xs={12}>
                       <TextField
                         fullWidth
                         size="small"
@@ -711,14 +712,12 @@ export default function Sales() {
                         placeholder="12 dígitos"
                         error={reference.length > 0 && reference.length !== 12}
                         helperText={reference.length === 12 ? '✓ Folio completo' : `${reference.length}/12 dígitos`}
-                        slotProps={{
-                          input: {
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <ReceiptLongIcon fontSize="small" sx={{ color: '#5B2C83' }} />
-                              </InputAdornment>
-                            ),
-                          }
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <ReceiptLongIcon fontSize="small" sx={{ color: '#5B2C83' }} />
+                            </InputAdornment>
+                          ),
                         }}
                       />
                     </Grid>

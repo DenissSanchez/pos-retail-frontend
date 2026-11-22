@@ -60,15 +60,16 @@ export default function Reports() {
         : null;
 
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/reports/sales`, {
-    params: { 
-      startDate: formattedStartDate, 
-      endDate: formattedEndDate 
-    }
+        params: { 
+          startDate: formattedStartDate, 
+          endDate: formattedEndDate 
+        }
       });
 
       setSales(response.data || []);
     } catch (error) {
       enqueueSnackbar('Error al cargar reporte de ventas', { variant: 'error' });
+      setSales([]); // Evita que se quede con datos corruptos ante un error
     } finally {
       setLoading(false);
     }
@@ -97,11 +98,14 @@ export default function Reports() {
     }, 0);
   };
 
-  // CÁLCULOS DE KPIs
-  const totalRevenue = sales.reduce((acc, sale) => acc + Number(sale.total || 0), 0);
-  const totalOrders = sales.length;
+  // --- BLINDAJE DE ARREGLOS ---
+  const safeSales = Array.isArray(sales) ? sales : [];
+
+  // CÁLCULOS DE KPIs (Protegidos con safeSales)
+  const totalRevenue = safeSales.reduce((acc, sale) => acc + Number(sale.total || 0), 0);
+  const totalOrders = safeSales.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  const totalProfit = sales.reduce((acc, sale) => acc + calculateSaleProfit(sale), 0);
+  const totalProfit = safeSales.reduce((acc, sale) => acc + calculateSaleProfit(sale), 0);
 
   // Helper para chips de método de pago
   const renderPaymentChip = (method) => {
@@ -119,10 +123,10 @@ export default function Reports() {
 
   // Exportar a CSV
   const exportToCSV = () => {
-    if (sales.length === 0) return;
+    if (safeSales.length === 0) return;
    
     const headers = ["Folio,Fecha,Cajero,Metodo Pago,Total Items,Total Venta,Ganancia Neta\n"];
-    const rows = sales.map(s => {
+    const rows = safeSales.map(s => {
       const profit = calculateSaleProfit(s);
       return `"${s.id || s.folio}","${new Date(s.createdAt).toLocaleString()}","${getUserName(s)}","${s.paymentMethod}",${s.items?.length || 0},${Number(s.total || 0).toFixed(2)},${profit.toFixed(2)}`;
     });
@@ -315,22 +319,22 @@ export default function Reports() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sales.length === 0 ? (
+                  {safeSales.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} align="center" sx={{ py: 4, color: '#888' }}>
                         {loading ? 'Cargando ventas...' : 'No se encontraron ventas en el periodo seleccionado.'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sales.map((sale) => {
+                    safeSales.map((sale) => {
                       const saleProfit = calculateSaleProfit(sale);
                       return (
                         <TableRow key={sale.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                           <TableCell sx={{ fontWeight: 'bold' }}>
-                            #{sale.id.slice(-6).toUpperCase()}
+                            #{sale.id ? sale.id.slice(-6).toUpperCase() : 'S/N'}
                           </TableCell>
                           <TableCell>
-                            {new Date(sale.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                            {sale.createdAt ? new Date(sale.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'}
                           </TableCell>
                           <TableCell>{getUserName(sale)}</TableCell>
                           <TableCell>{renderPaymentChip(sale.paymentMethod)}</TableCell>
@@ -338,7 +342,7 @@ export default function Reports() {
                             {sale.items?.reduce((acc, i) => acc + i.quantity, 0) || 0}
                           </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 'bold', color: '#5B2C83' }}>
-                            ${Number(sale.total).toFixed(2)}
+                            ${Number(sale.total || 0).toFixed(2)}
                           </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 'bold', color: '#2E7D32' }}>
                             ${saleProfit.toFixed(2)}
@@ -369,11 +373,11 @@ export default function Reports() {
             {selectedSale && (
               <>
                 <DialogTitle sx={{ fontWeight: 'bold', color: '#5B2C83', pb: 1 }}>
-                  Detalle de Venta #{selectedSale.id.slice(-6).toUpperCase()}
+                  Detalle de Venta #{selectedSale.id ? selectedSale.id.slice(-6).toUpperCase() : ''}
                 </DialogTitle>
                 <DialogContent dividers>
                   <Typography variant="caption" display="block" color="text.secondary" gutterBottom>
-                    Fecha: {new Date(selectedSale.createdAt).toLocaleString()}
+                    Fecha: {selectedSale.createdAt ? new Date(selectedSale.createdAt).toLocaleString() : 'N/A'}
                   </Typography>
                   <Typography variant="caption" display="block" color="text.secondary" gutterBottom>
                     Cajero: <strong>{getUserName(selectedSale)}</strong>
@@ -395,12 +399,12 @@ export default function Reports() {
                           {item.variant?.product?.name || 'Producto'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Talla: {item.variant?.size || 'N/A'} • Color: {item.variant?.color || 'N/A'} (x{item.quantity})
+                          Talla: {item.variant?.size || 'N/A'} | Color: {item.variant?.color || 'N/A'} (x{item.quantity})
                         </Typography>
                       </Box>
 
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        ${(Number(item.price) * item.quantity).toFixed(2)}
+                        ${(Number(item.price || 0) * (item.quantity || 0)).toFixed(2)}
                       </Typography>
                     </Box>
                   ))}
@@ -412,7 +416,7 @@ export default function Reports() {
                       Total Cobrado:
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#5B2C83' }}>
-                      ${Number(selectedSale.total).toFixed(2)}
+                      ${Number(selectedSale.total || 0).toFixed(2)}
                     </Typography>
                   </Box>
 

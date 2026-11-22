@@ -24,28 +24,62 @@ import {
   AccountBalance as TransferIcon,
   PointOfSale as PosIcon,
   ReceiptLong as SummaryIcon,
-  CallSplit as MixedIcon, // Ícono para ventas mixtas
+  CallSplit as MixedIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
-// URL base hacia el módulo de sesiones
-const API_BASE_URL = import.meta.env?.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL}/sessions` 
+const API_BASE_URL = import.meta.env?.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/sessions`
   : "http://localhost:3000/api/sessions";
+
+const buildEmptySummary = (session) => {
+  const initialCash = Number(session?.initialCash ?? session?.openingAmount ?? 0);
+  return {
+    initialCash,
+    paidCash: 0,
+    paidCard: 0,
+    paidTransfer: 0,
+    salesMixed: 0,
+    totalSales: 0,
+    totalTransactions: 0,
+    expectedCash: initialCash,
+  };
+};
+
+const normalizeSummary = (rawData, session) => {
+  const base = buildEmptySummary(session);
+  const raw = rawData?.data ?? rawData ?? {};
+
+  const initialCash = Number(raw.initialCash ?? raw.openingAmount ?? base.initialCash);
+  const paidCash = Number(raw.paidCash ?? raw.cashSales ?? 0);
+  const paidCard = Number(raw.paidCard ?? raw.cardSales ?? 0);
+  const paidTransfer = Number(raw.paidTransfer ?? raw.transferSales ?? 0);
+  const salesMixed = Number(raw.salesMixed ?? raw.mixedSales ?? 0);
+  const totalSales = Number(raw.totalSales ?? 0);
+  const totalTransactions = Number(raw.totalTransactions ?? raw.salesCount ?? 0);
+  const expectedCash = Number(raw.expectedCash ?? initialCash + paidCash);
+
+  return {
+    initialCash: Number.isFinite(initialCash) ? initialCash : 0,
+    paidCash: Number.isFinite(paidCash) ? paidCash : 0,
+    paidCard: Number.isFinite(paidCard) ? paidCard : 0,
+    paidTransfer: Number.isFinite(paidTransfer) ? paidTransfer : 0,
+    salesMixed: Number.isFinite(salesMixed) ? salesMixed : 0,
+    totalSales: Number.isFinite(totalSales) ? totalSales : 0,
+    totalTransactions: Number.isFinite(totalTransactions) ? totalTransactions : 0,
+    expectedCash: Number.isFinite(expectedCash) ? expectedCash : 0,
+  };
+};
 
 export default function CloseSessionModal({ open, onClose, activeSession, onSuccess }) {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Datos del resumen del turno
   const [summary, setSummary] = useState(null);
-
-  // Entradas del formulario
   const [finalCash, setFinalCash] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Cargar resumen de ventas cuando el modal se abre
   useEffect(() => {
     if (open && activeSession?.id) {
       fetchSummary(activeSession.id);
@@ -59,15 +93,21 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
     setError(null);
     try {
       const token = localStorage.getItem("token");
-      
+
       const response = await axios.get(`${API_BASE_URL}/${sessionId}/summary`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       console.log("Resumen recibido del backend:", response.data);
-      setSummary(response.data);
+      setSummary(normalizeSummary(response.data, activeSession));
     } catch (err) {
       console.error("Error al obtener resumen de caja:", err);
-      setError("No se pudieron cargar los datos del resumen del turno.");
+
+      // Si el backend indica que no hay movimientos/resumen (404), permitimos cerrar con ceros y fondo inicial
+      if (err.response?.status === 404) {
+        setSummary(buildEmptySummary(activeSession));
+      } else {
+        setError("No se pudieron cargar los datos del resumen del turno.");
+      }
     } finally {
       setLoadingSummary(false);
     }
@@ -80,14 +120,18 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
     setError(null);
   };
 
-  // Cálculos en tiempo real
-  const expectedCash = summary ? parseFloat(summary.expectedCash || 0) : 0;
-  const countedCash = parseFloat(finalCash) || 0;
-  const difference = finalCash !== "" ? countedCash - expectedCash : 0;
+  const expectedCash = summary ? Number(summary.expectedCash || 0) : 0;
+  const parsedFinalCash = parseFloat(finalCash);
+  const hasValidCashInput = finalCash !== "" && !Number.isNaN(parsedFinalCash) && parsedFinalCash >= 0;
+  const countedCash = hasValidCashInput ? parsedFinalCash : 0;
+  const difference =
+    finalCash !== "" && !Number.isNaN(parsedFinalCash)
+      ? Math.round((parsedFinalCash - expectedCash) * 100) / 100
+      : 0;
 
   const handleCloseSession = async () => {
-    if (finalCash === "" || isNaN(countedCash)) {
-      setError("Debes ingresar el dinero contado físicamente en caja.");
+    if (finalCash === "" || Number.isNaN(parsedFinalCash) || parsedFinalCash < 0) {
+      setError("Debes ingresar un monto de efectivo contado válido (0 o mayor).");
       return;
     }
 
@@ -129,7 +173,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      {/* Encabezado */}
       <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Box display="flex" alignItems="center" gap={1}>
           <SummaryIcon color="primary" fontSize="large" />
@@ -165,14 +208,20 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
           </Box>
         ) : summary ? (
           <Grid container spacing={2}>
-            {/* Sección 1: Resumen de Métricas */}
+            {summary.totalTransactions === 0 && (
+              <Grid item xs={12}>
+                <Alert severity="info">
+                  No se registraron ventas en este turno. Puedes cerrar la caja confirmando el efectivo en cajón.
+                </Alert>
+              </Grid>
+            )}
+
             <Grid item xs={12}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom fontWeight="bold">
                 RESUMEN DE OPERACIONES DEL TURNO
               </Typography>
             </Grid>
 
-            {/* Fondo Inicial */}
             <Grid item xs={6} sm={4} md={2.4}>
               <Card variant="outlined" sx={{ bgcolor: "background.default", height: "100%" }}>
                 <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -186,7 +235,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               </Card>
             </Grid>
 
-            {/* Ventas Efectivo */}
             <Grid item xs={6} sm={4} md={2.4}>
               <Card variant="outlined" sx={{ bgcolor: "background.default", height: "100%" }}>
                 <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -203,7 +251,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               </Card>
             </Grid>
 
-            {/* Ventas Tarjeta */}
             <Grid item xs={6} sm={4} md={2.4}>
               <Card variant="outlined" sx={{ bgcolor: "background.default", height: "100%" }}>
                 <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -220,7 +267,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               </Card>
             </Grid>
 
-            {/* Ventas Transferencia */}
             <Grid item xs={6} sm={4} md={2.4}>
               <Card variant="outlined" sx={{ bgcolor: "background.default", height: "100%" }}>
                 <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -237,7 +283,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               </Card>
             </Grid>
 
-            {/* Ventas Mixtas */}
             <Grid item xs={6} sm={4} md={2.4}>
               <Card variant="outlined" sx={{ bgcolor: "background.default", height: "100%" }}>
                 <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -254,7 +299,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               </Card>
             </Grid>
 
-            {/* Total acumulado */}
             <Grid item xs={12}>
               <Box
                 display="flex"
@@ -276,7 +320,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
               <Divider sx={{ my: 1 }} />
             </Grid>
 
-            {/* Sección 2: Conteo Físico y Balance */}
             <Grid item xs={12} md={6}>
               <Box p={2} border="1px solid" borderColor="divider" borderRadius={2} height="100%">
                 <Typography variant="subtitle2" fontWeight="bold" color="primary" gutterBottom display="flex" alignItems="center" gap={1}>
@@ -306,6 +349,28 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
                   autoFocus
                   sx={{ mt: 1 }}
                 />
+
+                {summary.totalTransactions === 0 && (
+                  <Box mt={1} display="flex" gap={1}>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => setFinalCash(String(expectedCash))}
+                    >
+                      Usar esperado ({formatCurrency(expectedCash)})
+                    </Button>
+                    {expectedCash !== 0 && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        color="inherit"
+                        onClick={() => setFinalCash("0")}
+                      >
+                        Poner $0
+                      </Button>
+                    )}
+                  </Box>
+                )}
               </Box>
             </Grid>
 
@@ -354,7 +419,7 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
                   variant="outlined"
                   multiline
                   rows={2}
-                  placeholder="Ej: Justificación de faltante o aclaraciones..."
+                  placeholder="Ej: Turno sin ventas / justificación de diferencia..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   sx={{ mt: 1 }}

@@ -12,9 +12,18 @@ export const LabelItem = ({ data }) => {
     variantColor = "",
     variantSize = "",
     price = 0,
-    barcode = "000000000000",
+    barcode = "750000000000",
     sku = ""
-  } = data;
+  } = data || {};
+
+  // 🛡️ Blindaje estricto del código de barras para evitar el NaN
+  const cleanBarcode = barcode && String(barcode).trim() !== "" && barcode !== "NaN"
+    ? String(barcode).trim()
+    : "750000000000";
+
+  // 🛡️ Blindaje del precio para evitar errores si viene nulo o texto inválido
+  const safePrice = Number(price);
+  const formattedPrice = !isNaN(safePrice) ? safePrice.toFixed(2) : "0.00";
 
   // Formato de variante legible (ej: "M / AZUL")
   const variantDetails = [variantSize, variantColor].filter(Boolean).join(" / ");
@@ -27,19 +36,19 @@ export const LabelItem = ({ data }) => {
           {productName.toUpperCase()}
         </span>
         <span className="label-price">
-          ${Number(price).toFixed(2)}
+          ${formattedPrice}
         </span>
       </div>
 
-      {/* Código de Barras (CODE128 vectorial) */}
+      {/* Código de Barras (CODE128 vectorial blindado) */}
       <div className="label-barcode-container">
         <Barcode
-          value={barcode || "000000000000"}
+          value={cleanBarcode}
           format="CODE128"
-          width={1.2}             /* Ancho de las barras */
-          height={28}             /* Altura del gráfico */
-          displayValue={true}     /* Muestra los números debajo */
-          fontSize={8}            /* Tamaño del número impreso */
+          width={1.2}            /* Ancho de las barras */
+          height={28}            /* Altura del gráfico */
+          displayValue={true}    /* Muestra los números debajo */
+          fontSize={8}           /* Tamaño del número impreso */
           fontOptions="bold"
           margin={0}
           marginTop={1}
@@ -62,8 +71,8 @@ LabelItem.propTypes = {
     productName: PropTypes.string,
     variantColor: PropTypes.string,
     variantSize: PropTypes.string,
-    price: PropTypes.number,
-    barcode: PropTypes.string,
+    price: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    barcode: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     sku: PropTypes.string
   }).isRequired
 };

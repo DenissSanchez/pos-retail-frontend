@@ -1,5 +1,4 @@
 // src/components/TicketPrint.jsx
-// src/components/TicketPrint.jsx
 import React, { forwardRef } from 'react';
 import { Box, Typography, Divider, Table, TableBody, TableCell, TableRow } from '@mui/material';
 
@@ -81,46 +80,52 @@ export const TicketPrint = forwardRef(({
           {/* Tabla de Productos */}
           <Table size="small" sx={{ width: '100%' }}>
             <TableBody>
-              {cart.map((item) => (
-                <React.Fragment key={item.variantId}>
-                  <TableRow>
-                    <TableCell colSpan={2} sx={{ border: 'none', p: '2px 0', fontWeight: 'bold', fontSize: '11px' }}>
-                      {item.productName}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow sx={{ borderBottom: '1px dashed #ccc' }}>
-                    <TableCell sx={{ border: 'none', p: '0 0 4px 0', fontSize: '10px' }}>
-                      {item.quantity} x ${item.price.toFixed(2)}
-                      {item.size ? ` (${item.size})` : ''}
-                    </TableCell>
-                    <TableCell align="right" sx={{ border: 'none', p: '0 0 4px 0', fontWeight: 'bold', fontSize: '11px' }}>
-                      ${(item.price * item.quantity).toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                </React.Fragment>
-              ))}
+              {cart.map((item, index) => {
+                const itemPrice = Number(item.price || 0);
+                const itemQty = Number(item.quantity || 1);
+                const itemTotal = itemPrice * itemQty;
+
+                return (
+                  <React.Fragment key={item.variantId || item.id || index}>
+                    <TableRow>
+                      <TableCell colSpan={2} sx={{ border: 'none', p: '2px 0', fontWeight: 'bold', fontSize: '11px' }}>
+                        {item.productName || item.name || 'Producto'}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow sx={{ borderBottom: '1px dashed #ccc' }}>
+                      <TableCell sx={{ border: 'none', p: '0 0 4px 0', fontSize: '10px' }}>
+                        {itemQty} x ${itemPrice.toFixed(2)}
+                        {item.size ? ` (${item.size})` : ''}
+                      </TableCell>
+                      <TableCell align="right" sx={{ border: 'none', p: '0 0 4px 0', fontWeight: 'bold', fontSize: '11px' }}>
+                        ${itemTotal.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
+                );
+              })}
             </TableBody>
           </Table>
 
           <Divider sx={{ my: 1, borderColor: '#000', borderStyle: 'dashed' }} />
 
           {/* Totales y Descuentos */}
-          {discountPercent > 0 && (
+          {Number(discountPercent) > 0 && (
             <>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', my: 0.3 }}>
                 <Typography variant="body2" sx={{ fontSize: '11px' }}>SUBTOTAL:</Typography>
-                <Typography variant="body2" sx={{ fontSize: '11px' }}>${subtotal.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '11px' }}>${Number(subtotal || 0).toFixed(2)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', my: 0.3 }}>
                 <Typography variant="body2" sx={{ fontSize: '11px' }}>DESCUENTO ({discountPercent}%):</Typography>
-                <Typography variant="body2" sx={{ fontSize: '11px' }}>-${discountAmount.toFixed(2)}</Typography>
+                <Typography variant="body2" sx={{ fontSize: '11px' }}>-${Number(discountAmount || 0).toFixed(2)}</Typography>
               </Box>
             </>
           )}
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', my: 0.8 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: '14px' }}>TOTAL:</Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: '16px' }}>${total.toFixed(2)}</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: '16px' }}>${Number(total || 0).toFixed(2)}</Typography>
           </Box>
 
           <Divider sx={{ my: 1, borderColor: '#000', borderStyle: 'dashed' }} />
@@ -134,12 +139,12 @@ export const TicketPrint = forwardRef(({
           {paymentMethod === 'MIXTO' && (
             <Box sx={{ pl: 1, my: 0.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" sx={{ fontSize: '10px' }}>• Efectivo:</Typography>
-                <Typography variant="caption" sx={{ fontSize: '10px' }}>${mixedCash.toFixed(2)}</Typography>
+                <Typography variant="caption" sx={{ fontSize: '10px' }}>Efectivo:</Typography>
+                <Typography variant="caption" sx={{ fontSize: '10px' }}>${Number(mixedCash || 0).toFixed(2)}</Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="caption" sx={{ fontSize: '10px' }}>• Tarjeta:</Typography>
-                <Typography variant="caption" sx={{ fontSize: '10px' }}>${mixedCard.toFixed(2)}</Typography>
+                <Typography variant="caption" sx={{ fontSize: '10px' }}>Tarjeta:</Typography>
+                <Typography variant="caption" sx={{ fontSize: '10px' }}>${Number(mixedCard || 0).toFixed(2)}</Typography>
               </Box>
             </Box>
           )}
@@ -159,3 +164,5 @@ export const TicketPrint = forwardRef(({
     </div>
   );
 });
+
+export default TicketPrint;
