@@ -17,20 +17,25 @@ export const TicketPrint = forwardRef(({
       <div ref={ref}>
         {/* 🎨 Estilos CSS específicos para impresora térmica */}
         <style>
-          {`
-            @media print {
-              @page {
-                size: 80mm auto; /* Para rollo de 80mm */
-                margin: 0;      /* Quita los márgenes por defecto del navegador */
-              }
-              body {
-                margin: 0;
-                padding: 0;
-                background-color: #fff;
-              }
-            }
-          `}
-        </style>
+  {`
+    @media print {
+      @page {
+        size: 58mm auto;
+        margin: 0;
+      }
+
+      html, body {
+        width: 58mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      body {
+        background: white !important;
+      }
+    }
+  `}
+</style>
 
         {/* 🧾 Contenedor del Ticket */}
         <Box
