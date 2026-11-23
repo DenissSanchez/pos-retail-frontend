@@ -51,9 +51,9 @@ const normalizeSummary = (rawData, session) => {
   const raw = rawData?.data ?? rawData ?? {};
 
   const initialCash = Number(raw.initialCash ?? raw.openingAmount ?? base.initialCash);
-  const paidCash = Number(raw.paidCash ?? raw.cashSales ?? 0);
-  const paidCard = Number(raw.paidCard ?? raw.cardSales ?? 0);
-  const paidTransfer = Number(raw.paidTransfer ?? raw.transferSales ?? 0);
+  const paidCash = Number(raw.salesCash ?? raw.paidCash ?? raw.cashSales ?? 0);
+  const paidCard = Number(raw.salesCard ?? raw.paidCard ?? raw.cardSales ?? 0);
+  const paidTransfer = Number(raw.salesTransfer ?? raw.paidTransfer ?? raw.transferSales ?? 0);
   const salesMixed = Number(raw.salesMixed ?? raw.mixedSales ?? 0);
   const totalSales = Number(raw.totalSales ?? 0);
   const totalTransactions = Number(raw.totalTransactions ?? raw.salesCount ?? 0);
@@ -102,7 +102,6 @@ export default function CloseSessionModal({ open, onClose, activeSession, onSucc
     } catch (err) {
       console.error("Error al obtener resumen de caja:", err);
 
-      // Si el backend indica que no hay movimientos/resumen (404), permitimos cerrar con ceros y fondo inicial
       if (err.response?.status === 404) {
         setSummary(buildEmptySummary(activeSession));
       } else {
